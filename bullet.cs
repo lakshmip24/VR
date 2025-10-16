@@ -5,8 +5,8 @@ using UnityEngine.UI;
 
 public class bullet : MonoBehaviour
 {
-    int score;
-    int turn;
+    int score=0;
+    int turn=0;
     Rigidbody rb;
     public Text scoreText;
     // Start is called before the first frame update
@@ -14,8 +14,7 @@ public class bullet : MonoBehaviour
     {
         UpdateScoreText();
         rb = GetComponent<Rigidbody>();
-        turn=0;
-        score=0;
+      
         
     }
 
@@ -24,11 +23,11 @@ public class bullet : MonoBehaviour
     {
         if (Input.GetKey(KeyCode.A))
         {
-            transform.Translate(0.0f, 0.0f, -0.1f);
+            transform.Translate(0.0f, 0.0f, -0.01f);
         }
         if (Input.GetKey(KeyCode.D))
         {
-            transform.Translate(0.0f, 0.0f, 0.1f);
+            transform.Translate(0.0f, 0.0f, 0.01f);
         }
         
         if (Input.GetKey(KeyCode.Space))
@@ -42,6 +41,11 @@ public class bullet : MonoBehaviour
              turn=turn+1;
              Debug.Log("Turn: " + turn);
         }
+        if(rb.position.x>1.0f)
+        {
+            rb.isKinematic = true;
+            rb.position = new Vector3(-11.12f, 1.295f, -1.45f);
+        }
     }
    void OnCollisionEnter(Collision collision)
 {
@@ -52,17 +56,13 @@ public class bullet : MonoBehaviour
         score += 1;
         Debug.Log("Score: " + score);
         UpdateScoreText();
-        if(turn<4)
+        if(turn<55)
         {
             rb.isKinematic = true;
-            rb.position = new Vector3(-11.12f, 1.295f, 0.0f);
-            Debug.Log("hi ");
+            rb.position = new Vector3(-11.12f, 1.295f, -1.45f);
+           
         }
-        if(rb.position.x==0)
-        {
-            rb.isKinematic = true;
-            rb.position = new Vector3(-11.12f, 1.295f, 0.0f);
-        }
+        
         if (score == 3)
         {
             // Load scene named "2"
