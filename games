@@ -127,6 +127,77 @@ public class basketMovement : MonoBehaviour
 
 
 
+//BallSpawing
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class BallSpawning : MonoBehaviour
+{
+    public GameObject prefab;
+    public float speed = 5.0f;
+    public int score = 0;
+
+    void Start()
+    {
+        StartCoroutine(SpawnBallRoutine());
+    }
+
+    void Update()
+    {
+        // Move left
+        if (Input.GetKey(KeyCode.A))
+        {
+            transform.Translate(Vector3.left * Time.deltaTime * speed);
+        }
+
+        // Move right
+        if (Input.GetKey(KeyCode.D))
+        {
+            transform.Translate(Vector3.right * Time.deltaTime * speed);
+        }
+    }
+
+    IEnumerator SpawnBallRoutine()
+    {
+        while (true) // keep spawning every 15 seconds
+        {
+            Vector3 spawnPos = new Vector3(Random.Range(-5f, 5f), 5f, 0f);
+            Instantiate(prefab, spawnPos, Quaternion.identity);
+            yield return new WaitForSeconds(15.0f);
+        }
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("ball"))
+        {
+            Destroy(collision.gameObject); // destroy the ball, not the player
+            score += 1;
+            Debug.Log("Score: " + score);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //collisionwithhole
 using System.Collections;
 using System.Collections.Generic;
