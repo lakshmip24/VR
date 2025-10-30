@@ -217,3 +217,431 @@ public class stickMovement : MonoBehaviour
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//billiard balls
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Three.js Billiards (2 balls + pocket)</title>
+  <style>
+    html,body { height:100%; margin:0; background:#111; }
+    canvas { display:block; }
+    #info { position: absolute; left:12px; top:12px; color:#ddd; font-family: monospace; background:rgba(0,0,0,0.35); padding:8px; border-radius:6px }
+    #reset { margin-left:8px }
+  </style>
+</head>
+<body>
+  <div id="info">Click anywhere on the table to strike the white (cue) ball toward that point. Pocket the red ball.<button id="reset">Reset</button></div>
+  <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+  <script>
+  // Basic scene + simple physics for two balls and pockets
+  let scene = new THREE.Scene();
+  const W = window.innerWidth, H = window.innerHeight;
+  let camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
+  camera.position.set(0, 60, 60);
+  camera.lookAt(0,0,0);
+
+  let renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(W,H);
+  document.body.appendChild(renderer.domElement);
+
+  // Lighting
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+  hemi.position.set(0,50,0); scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(0,50,50); scene.add(dir);
+
+  // Table
+  const tableWidth = 60, tableHeight = 40;
+  const tableGeo = new THREE.BoxGeometry(tableWidth, 2, tableHeight);
+  const tableMat = new THREE.MeshStandardMaterial({color:0x0b5d28}); // green felt
+  const table = new THREE.Mesh(tableGeo, tableMat);
+  table.position.y = -1; // a little below origin
+  scene.add(table);
+
+  // Rails (simple visual only)
+  const railMat = new THREE.MeshStandardMaterial({color:0x3b2b1b});
+  function makeRail(x,z,w,h) { const g=new THREE.BoxGeometry(w,4,h); const m=new THREE.Mesh(g,railMat); m.position.set(x,1.5,z); scene.add(m); }
+  makeRail(0, -(tableHeight/2 + 2), tableWidth+4, 4);
+  makeRail(0,  (tableHeight/2 + 2), tableWidth+4, 4);
+  makeRail(-(tableWidth/2 + 2), 0, 4, tableHeight+4);
+  makeRail( (tableWidth/2 + 2), 0, 4, tableHeight+4);
+
+  // Pocket definition (four corners)
+  const pockets = [
+    new THREE.Vector3(-tableWidth/2, 0, -tableHeight/2),
+    new THREE.Vector3(tableWidth/2, 0, -tableHeight/2),
+    new THREE.Vector3(-tableWidth/2, 0, tableHeight/2),
+    new THREE.Vector3(tableWidth/2, 0, tableHeight/2)
+  ];
+  const pocketRadius = 4.0;
+
+  // Ball params and helpers
+  const ballRadius = 2.0;
+  function makeBall(color){
+    const g = new THREE.SphereGeometry(ballRadius, 32, 32);
+    const m = new THREE.MeshStandardMaterial({color});
+    const mesh = new THREE.Mesh(g,m);
+    mesh.castShadow=true; mesh.receiveShadow=false;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  // Cue (white) ball (the striker)
+  const cueBall = makeBall(0xffffff);
+  // target (red) ball
+  const targetBall = makeBall(0xff3333);
+
+  // initial positions and velocities
+  let cue = { mesh: cueBall, pos: new THREE.Vector3(-10, ballRadius, 0), vel: new THREE.Vector3() };
+  let target = { mesh: targetBall, pos: new THREE.Vector3(10, ballRadius, 0), vel: new THREE.Vector3() };
+
+  function applyPositions(){ cue.mesh.position.copy(cue.pos); target.mesh.position.copy(target.pos); }
+  applyPositions();
+
+  // Cue stick visual (cylinder), appears when aiming
+  const stickGeom = new THREE.CylinderGeometry(0.2,0.2,30,12);
+  const stickMat = new THREE.MeshStandardMaterial({color:0x8b5a2b});
+  const cueStick = new THREE.Mesh(stickGeom, stickMat);
+  cueStick.rotation.z = Math.PI / 2;
+  cueStick.visible = false;
+  scene.add(cueStick);
+
+  // Physics parameters
+  const friction = 0.992; // velocity multiplier per frame
+  const dt = 1/60;
+
+  // Simple elastic collision resolution between two equal-mass spheres
+  function resolveSphereCollision(a, b){
+    const rel = new THREE.Vector3().subVectors(b.pos, a.pos);
+    const dist = rel.length();
+    if(dist === 0) return;
+    if(dist < ballRadius*2){
+      // separate overlapping
+      const overlap = ballRadius*2 - dist;
+      rel.normalize();
+      a.pos.addScaledVector(rel, -overlap*0.5);
+      b.pos.addScaledVector(rel, overlap*0.5);
+
+      // compute velocities along collision normal
+      const normal = rel.clone();
+      const va = a.vel.dot(normal);
+      const vb = b.vel.dot(normal);
+      // swap the components along the normal (equal mass elastic)
+      const vaNew = vb;
+      const vbNew = va;
+      a.vel.addScaledVector(normal, vaNew - va);
+      b.vel.addScaledVector(normal, vbNew - vb);
+    }
+  }
+
+  // Table bounds (balls reflect off rails)
+  function handleRails(ball){
+    // X bounds
+    const halfW = tableWidth/2 - ballRadius;
+    const halfH = tableHeight/2 - ballRadius;
+    if(ball.pos.x < -halfW){ ball.pos.x = -halfW; ball.vel.x *= -0.8; }
+    if(ball.pos.x >  halfW){ ball.pos.x = halfW; ball.vel.x *= -0.8; }
+    if(ball.pos.z < -halfH){ ball.pos.z = -halfH; ball.vel.z *= -0.8; }
+    if(ball.pos.z >  halfH){ ball.pos.z = halfH; ball.vel.z *= -0.8; }
+  }
+
+  // Pocket detection
+  function checkPockets(ball){
+    for(let p of pockets){
+      const d = Math.hypot(ball.pos.x - p.x, ball.pos.z - p.z);
+      if(d < pocketRadius){
+        // ball is pocketed — remove it from scene (move below table and zero velocity)
+        ball.mesh.visible = false;
+        ball.pos.set(0, -100, 0);
+        ball.vel.set(0,0,0);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Main loop
+  let last = performance.now();
+  function animate(t){
+    const now = performance.now();
+    const elapsed = (now - last)/1000; last = now;
+
+    // integrate simple physics (fixed-step feel)
+    const steps = Math.max(1, Math.floor(elapsed / dt));
+    for(let i=0;i<steps;i++){
+      // update positions
+      cue.pos.addScaledVector(cue.vel, dt);
+      target.pos.addScaledVector(target.vel, dt);
+      // collisions between balls
+      resolveSphereCollision(cue, target);
+      // rails
+      handleRails(cue);
+      handleRails(target);
+      // friction
+      cue.vel.multiplyScalar(friction);
+      target.vel.multiplyScalar(friction);
+      // pocket check
+      checkPockets(cue);
+      checkPockets(target);
+    }
+
+    applyPositions();
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  // Pointer handling: click on table to strike cue ball toward that point
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  function getPointOnTable(clientX, clientY){
+    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    // plane at y = ballRadius
+    const planeY = new THREE.Plane(new THREE.Vector3(0,1,0), -ballRadius);
+    const pos = new THREE.Vector3();
+    raycaster.ray.intersectPlane(planeY, pos);
+    return pos;
+  }
+
+  window.addEventListener('click', (ev)=>{
+    const pt = getPointOnTable(ev.clientX, ev.clientY);
+    if(!pt) return;
+    // direction from cue ball to clicked point
+    const dir = new THREE.Vector3().subVectors(pt, cue.pos);
+    dir.y = 0;
+    const dist = dir.length();
+    if(dist < 0.1) return;
+    dir.normalize();
+    // apply impulse proportional to distance clicked (clamped)
+    const power = Math.min(dist*2.2, 60);
+    cue.vel.addScaledVector(dir, power * 0.05);
+
+    // optional: show stick briefly in opposite direction
+    cueStick.visible = true;
+    cueStick.position.copy(cue.pos);
+    // rotate and position stick so that it's behind the cue ball relative to strike direction
+    const angle = Math.atan2(dir.z, dir.x);
+    cueStick.rotation.y = -angle;
+    cueStick.position.addScaledVector(dir, -12);
+    setTimeout(()=> cueStick.visible = false, 300);
+  });
+
+  // Reset button
+  document.getElementById('reset').addEventListener('click', ()=>{
+    cue.pos.set(-10, ballRadius, 0); cue.vel.set(0,0,0); cue.mesh.visible = true;
+    target.pos.set(10, ballRadius, 0); target.vel.set(0,0,0); target.mesh.visible = true;
+    applyPositions();
+  });
+
+  window.addEventListener('resize', ()=>{
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+  });
+
+  // helper grid and axes for orientation
+  const grid = new THREE.GridHelper(120, 24, 0x222222, 0x222222);
+  grid.rotation.x = Math.PI/2; grid.position.y = 0.01; scene.add(grid);
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//football
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Three.js Football Goal Game</title>
+  <style>
+    html,body { height:100%; margin:0; background:#222; }
+    canvas { display:block; }
+    #info { position:absolute; top:10px; left:10px; color:white; font-family:sans-serif; background:rgba(0,0,0,0.5); padding:10px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <div id="info">Click on the ground to shoot the ball toward that point. Try to score in the goal! <button id="reset">Reset</button></div>
+  <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+  <script>
+    let scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 500);
+    camera.position.set(0, 40, 60);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Lighting
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(30, 50, 50);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // Ground
+    const fieldGeo = new THREE.PlaneGeometry(100, 60);
+    const fieldMat = new THREE.MeshStandardMaterial({color:0x2e8b57});
+    const field = new THREE.Mesh(fieldGeo, fieldMat);
+    field.rotation.x = -Math.PI/2;
+    scene.add(field);
+
+    // Goalpost
+    const postMat = new THREE.MeshStandardMaterial({color:0xffffff});
+    function makePost(x,z){
+      const postGeo = new THREE.CylinderGeometry(0.5,0.5,10,16);
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.set(x,5,z);
+      scene.add(post);
+    }
+    // Two side posts + top bar
+    const goalZ = -25;
+    makePost(-5, goalZ);
+    makePost(5, goalZ);
+    const barGeo = new THREE.CylinderGeometry(0.5,0.5,10,16);
+    const bar = new THREE.Mesh(barGeo, postMat);
+    bar.rotation.z = Math.PI/2;
+    bar.position.set(0,10, goalZ);
+    scene.add(bar);
+
+    // Football (sphere)
+    const ballGeo = new THREE.SphereGeometry(2, 32, 32);
+    const ballMat = new THREE.MeshStandardMaterial({color:0xffffff});
+    const ball = new THREE.Mesh(ballGeo, ballMat);
+    ball.position.set(0, 2, 15);
+    scene.add(ball);
+
+    // Simple physics variables
+    let vel = new THREE.Vector3();
+    const friction = 0.98;
+    const gravity = -9.8;
+    let grounded = true;
+    let score = 0;
+
+    // Audio (crowd cheer)
+    const listener = new THREE.AudioListener();
+    camera.add(listener);
+    const sound = new THREE.Audio(listener);
+    const audioLoader = new THREE.AudioLoader();
+    audioLoader.load('https://cdn.pixabay.com/download/audio/2022/03/09/audio_b0a918f4c8.mp3?filename=crowd-cheer-14544.mp3', function(buffer){
+      sound.setBuffer(buffer);
+      sound.setVolume(0.6);
+    });
+
+    // Raycaster for click targeting
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function getGroundPoint(clientX, clientY){
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+      const point = new THREE.Vector3();
+      raycaster.ray.intersectPlane(plane, point);
+      return point;
+    }
+
+    window.addEventListener('click', (e)=>{
+      const target = getGroundPoint(e.clientX, e.clientY);
+      const dir = new THREE.Vector3().subVectors(target, ball.position);
+      dir.y = 4; // upward kick
+      dir.normalize();
+      vel.copy(dir.multiplyScalar(40));
+      grounded = false;
+    });
+
+    document.getElementById('reset').addEventListener('click', ()=>{
+      ball.position.set(0,2,15);
+      vel.set(0,0,0);
+      grounded = true;
+    });
+
+    function animate(){
+      requestAnimationFrame(animate);
+
+      // Simple motion update
+      if(!grounded){
+        vel.y += gravity * 0.02; // apply gravity
+        ball.position.addScaledVector(vel, 0.02);
+        vel.multiplyScalar(friction);
+
+        // Bounce off ground
+        if(ball.position.y < 2){
+          ball.position.y = 2;
+          vel.y *= -0.5;
+          if(Math.abs(vel.y) < 1) vel.y = 0;
+        }
+
+        // Check goal
+        if(ball.position.z < goalZ && Math.abs(ball.position.x) < 5 && ball.position.y < 10){
+          score++;
+          console.log('GOAL! Score:', score);
+          if(sound.isBuffer){ sound.play(); }
+          grounded = true;
+        }
+
+        // Stop if out of bounds
+        if(ball.position.length() > 100){ grounded = true; }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', ()=>{
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
