@@ -1,0 +1,219 @@
+//ballMovement
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class ballMovement : MonoBehaviour
+{
+    Rigidbody rb;
+    public GameObject football;
+    public float thrust = 10.0f;
+    // Start is called before the first frame update
+    void Start()
+    {
+        rb=GetComponent<Rigidbody>();
+        
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+         if (Input.GetKey(KeyCode.D))
+         {
+            transform.Translate(Vector3.right * Time.deltaTime);
+         }
+         if (Input.GetKey(KeyCode.A))
+         {
+            transform.Translate(Vector3.left * Time.deltaTime);
+         }
+         if (Input.GetKeyDown(KeyCode.Mouse0))
+         {
+            rb.AddForce(0, 0, thrust, ForceMode.Impulse);
+         }
+    }
+
+    void FixedUpdate()
+    {
+         if(rb.position.y == 10.5f)
+         {
+            rb.isKinematic = true;
+            rb.position = new Vector3(-0.13f, -0.959f, -2.0f);
+         }
+    }
+    
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.gameObject.CompareTag("net"))
+        {
+           Debug.Log("Goal Scored");
+        }
+    }
+
+}
+
+
+
+
+
+
+
+//basketMovement
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class basketMovement : MonoBehaviour
+{
+    public float speed = 5.0f;
+    public int score;
+    public GameObject hen,egg,basket;
+    public Rigidbody rb,rb_egg;
+    // Start is called before the first frame update
+    void Start()
+    {
+        score=0;
+        hen=GameObject.FindWithTag("hen");
+        rb=hen.GetComponent<Rigidbody>();
+        egg=GameObject.FindWithTag("egg");
+        rb_egg=egg.GetComponent<Rigidbody>();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+         if (Input.GetKey(KeyCode.A))
+         {
+            transform.Translate(Vector3.left * Time.deltaTime * speed);
+         }
+         if (Input.GetKey(KeyCode.D))
+         {
+            transform.Translate(Vector3.right * Time.deltaTime * speed);
+         }
+         if (Input.GetKey(KeyCode.E))
+         {
+            rb_egg.useGravity=true;
+             rb_egg.isKinematic=false;
+         }
+        if (Input.GetKey(KeyCode.Z))
+         {
+            hen.transform.Translate(Vector3.left * Time.deltaTime * speed);
+         }
+         if (Input.GetKey(KeyCode.C))
+         {
+            hen.transform.Translate(Vector3.right * Time.deltaTime * speed);
+         }
+            
+    }
+    void OnCollisionEnter(Collision collision)
+    {
+         if (collision.gameObject.CompareTag("egg"))
+        {
+            rb_egg.transform.position = rb.transform.position + new Vector3(0, -0.3f, 0);
+             rb_egg.useGravity = false;
+             rb_egg.isKinematic = true;
+            score=score+1;
+            Debug.Log("Score: " + score);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+//collisionwithhole
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class collisionwithholw : MonoBehaviour
+{
+    // Start is called before the first frame update
+    void Start()
+    {
+        
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        
+    }
+    void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("hole"))
+        {
+          // Destroy(collision.gameObject);
+           Debug.Log("ball in pocket");
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+//stickMovement
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class stickMovement : MonoBehaviour
+{
+    Rigidbody m_Rigidbody,MainBallRigidbody;
+    public GameObject MainBall;
+    public float thrust = 20f;
+    // Start is called before the first frame update
+    void Start()
+    {
+        m_Rigidbody = GetComponent<Rigidbody>();
+        MainBall = GameObject.FindWithTag("MainBall");
+        MainBallRigidbody = MainBall.GetComponent<Rigidbody>();
+        
+    }
+
+    // Update is called once per frame
+    void FixedUpdate()
+    {
+        KeyboardInput();
+    }
+    void KeyboardInput()
+    {
+        if (Input.GetKey(KeyCode.W))
+        {
+            transform.Translate(Vector3.right * Time.deltaTime);
+             m_Rigidbody.AddForce(0, 0, thrust, ForceMode.Force);
+        }
+        if (Input.GetKey(KeyCode.A))
+        {
+            transform.Translate(Vector3.forward * Time.deltaTime);
+
+        }
+        if (Input.GetKey(KeyCode.D))
+        {
+            transform.Translate(Vector3.back * Time.deltaTime);
+
+        }
+    }
+    void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("MainBall"))
+        {
+            MainBallRigidbody.AddForce(0, 0, thrust, ForceMode.Impulse);
+        }
+    }
+}
