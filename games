@@ -1,3 +1,30 @@
+//color
+using UnityEngine;
+
+public class ChangeColor : MonoBehaviour
+{
+    // Public variable to assign color from Inspector
+    public Color newColor = Color.red;
+
+    void Start()
+    {
+        // Get the Renderer component attached to this GameObject
+        Renderer rend = GetComponent<Renderer>();
+
+        // Change the material color
+        rend.material.color = newColor;
+    }
+}
+
+
+
+
+
+
+
+
+
+
 //score
 
 using System.Collections;
